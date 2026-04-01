@@ -22,19 +22,33 @@ PROXY_SOURCES = {
     ]
 }
 
+def is_valid_proxy(proxy):
+    # 过滤掉 0.0.0.0, 127.0.0.1 等无效 IP
+    invalid_ips = ['0.0.0.0', '127.0.0.1', 'localhost']
+    ip = proxy.split(':')[0]
+    if ip in invalid_ips:
+        return False
+    # 简单的私有 IP 过滤 (可选，但通常代理不应该是私有 IP)
+    if ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.16.'):
+        return False
+    return True
+
 def fetch_proxies(url):
     try:
         response = requests.get(url, timeout=15)
         if response.status_code == 200:
+            proxies = []
             # 处理 Geonode API 的 JSON 格式
             if "geonode.com" in url:
                 data = response.json()
-                proxies = []
                 for item in data.get('data', []):
                     proxies.append(f"{item['ip']}:{item['port']}")
-                return proxies
-            # 处理普通文本格式
-            return re.findall(r'\d+\.\d+\.\d+\.\d+:\d+', response.text)
+            else:
+                # 处理普通文本格式
+                proxies = re.findall(r'\d+\.\d+\.\d+\.\d+:\d+', response.text)
+            
+            # 过滤无效代理
+            return [p for p in proxies if is_valid_proxy(p)]
     except Exception as e:
         print(f"Error fetching from {url}: {e}")
     return []
